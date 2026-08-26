@@ -1,0 +1,8 @@
+[workspace]
+members = ["crates/wow-dsp", "crates/wow-plugin", "xtask"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+rust-version = "1.88"

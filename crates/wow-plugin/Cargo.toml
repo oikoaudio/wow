@@ -1,0 +1,16 @@
+[package]
+name = "wow-plugin"
+version = "0.1.1-beta.1"
+edition = "2024"
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+egui = { version = "0.36.1", default-features = false, features = ["default_fonts"] }
+nice-plug = { version = "0.3.0", default-features = false, features = ["assert_process_allocs", "editor", "vst3"] }
+nice-plug-egui = { version = "0.4.0", default-features = false, features = ["opengl"] }
+wow-dsp = { path = "../wow-dsp" }

@@ -1,0 +1,126 @@
+name: Build plugins
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            runner: ubuntu-24.04
+            artifact: wow-linux-x86_64
+            archive: wow-linux-x86_64.tar.gz
+          - name: Windows x86_64
+            runner: windows-2025
+            artifact: wow-windows-x86_64
+            archive: wow-windows-x86_64.zip
+          - name: macOS Apple Silicon
+            runner: macos-15
+            artifact: wow-macos-arm64
+            archive: wow-macos-arm64.zip
+          - name: macOS Intel
+            runner: macos-15-intel
+            artifact: wow-macos-x86_64
+            archive: wow-macos-x86_64.zip
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux GUI dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libx11-dev \
+            libxcursor-dev \
+            libxcb-dri2-0-dev \
+            libxcb-icccm4-dev \
+            libx11-xcb-dev \
+            mesa-common-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev
+
+      - name: Test workspace
+        run: cargo test --workspace
+
+      - name: Build CLAP and VST3 bundles
+        run: cargo run -p xtask -- bundle wow-plugin --release
+
+      - name: Package Linux bundles
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          tar -C target/bundled -czf "dist/${{ matrix.archive }}" .
+
+      - name: Package macOS bundles
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc target/bundled "dist/${{ matrix.archive }}"
+
+      - name: Package Windows bundles
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path target\bundled\* -DestinationPath "dist\${{ matrix.archive }}" -Force
+
+      - name: Upload plugin bundles
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download platform archives
+        uses: actions/download-artifact@v8
+        with:
+          pattern: wow-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            release_flags=()
+            if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+              release_flags+=(--prerelease)
+            fi
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --verify-tag \
+              "${release_flags[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Oiko Wow $GITHUB_REF_NAME" \
+              --notes "See the README for installation instructions and known limitations."
+          fi

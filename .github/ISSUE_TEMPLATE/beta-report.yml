@@ -1,0 +1,99 @@
+name: Beta report
+description: Report a compatibility problem, audio issue, or usability problem in Oiko Wow.
+title: "[Beta]: "
+labels:
+  - beta
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Oiko Wow. Please use one report per problem and remove sensitive information from logs and screenshots.
+
+  - type: dropdown
+    id: report-type
+    attributes:
+      label: Report type
+      options:
+        - Crash or failure to load
+        - Audio or DSP problem
+        - Automation or state problem
+        - Interface or usability problem
+        - Compatibility report
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Oiko Wow version
+      placeholder: 0.1.1-beta.1
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.6, Windows 11 24H2, Ubuntu 24.04, etc.
+    validations:
+      required: true
+
+  - type: input
+    id: daw
+    attributes:
+      label: DAW and version
+      placeholder: REAPER 7.XX, Bitwig Studio 5.X, etc.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: format
+    attributes:
+      label: Plug-in format
+      options:
+        - CLAP
+        - VST3
+        - Both
+    validations:
+      required: true
+
+  - type: input
+    id: audio-settings
+    attributes:
+      label: Audio settings
+      description: Include sample rate, buffer size, and channel layout when known.
+      placeholder: 48 kHz, 256 samples, stereo
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observed result and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Insert Oiko Wow on...
+        2. Set...
+        3. Start playback...
+    validations:
+      required: true
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Logs, screenshots, or audio examples
+      description: Drag files here or provide links. Do not include private project material.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reproduced this with the version shown above and searched for an existing report.
+          required: true

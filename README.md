@@ -22,7 +22,7 @@ HQ mode is the default. Normal and Ultra trade processing cost against progressi
 
 The distinction matters most on exposed high frequencies and when several modulated signals are layered. It also gives the same DSP core a clean basis for future modulated-delay and feedback effects.
 
-![Matched spectral comparison of Plug-ins A, B, C, and Oiko Wow](docs/images/plugin-spectrum-comparison.png)
+![Matched spectral comparison of other wow fx vs Oiko Wow](docs/images/plugin-spectrum-comparison-v2.png)
 
 *Identical input, modulation depth, sample rate, level, FFT settings, and render duration. Competing products anonymized.*
 

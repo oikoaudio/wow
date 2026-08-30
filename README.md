@@ -1,9 +1,9 @@
 # Wow
 
-> **Public beta — v0.1.1-beta.1.** Oiko Wow is ready for testing, but the
+> **Public beta — v0.1.1-beta.2.** Oiko Wow is ready for testing, but the
 > builds are unsigned and should not yet be trusted in irreplaceable sessions.
 
-**[Download beta builds](https://github.com/oikoaudio/wow/releases/tag/v0.1.1-beta.1)**
+**[Download beta builds](https://github.com/oikoaudio/wow/releases/tag/v0.1.1-beta.2)**
 for macOS, Windows, and Linux.
 
 Wow is a free and open-source pitch-modulation plug-in for macOS, Windows, and Linux. It creates slow warble, fast flutter, and natural drift by continuously changing playback speed, without adding saturation, hiss, dropouts, or EQ.

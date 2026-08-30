@@ -20,6 +20,7 @@ pub(crate) const DISPLAY_REFRESH_HZ: f64 = 480.0;
 const DISPLAY_POINTS: usize = 2048;
 pub(crate) const EDITOR_WIDTH: f32 = 500.0;
 pub(crate) const EDITOR_HEIGHT: f32 = 390.0;
+const UI_SCALE_STEPS: [f32; 7] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 const PROJECT_URL: &str = "https://github.com/oikoaudio/wow";
 
 pub(crate) struct ModulationDisplay {
@@ -97,6 +98,9 @@ impl NiceEguiApp for WowEditor {
     ) -> Result<(), HandlerError> {
         self.gui_context = Some(nice_gui_ctx);
         apply_theme(&egui_ctx, self.dark.load(Ordering::Relaxed));
+        let settled_scale = closest_ui_scale(self.params.ui_scale.get());
+        self.params.ui_scale.set(settled_scale);
+        egui_ctx.set_zoom_factor(settled_scale);
         Ok(())
     }
 
@@ -188,13 +192,29 @@ impl NiceEguiApp for WowEditor {
 
         footer(ui, palette, &self.params, &setter);
         if self.about_open {
-            about_popup(ui, palette, &mut self.about_open);
+            about_popup(ui, palette, &mut self.about_open, &self.params.ui_scale);
         }
     }
 
     fn editor_closed(&mut self) {
         self.gui_context = None;
     }
+}
+
+fn request_settled_scale(context: &egui::Context, scale: f32) {
+    let scale = closest_ui_scale(scale);
+    context.set_zoom_factor(scale);
+    context.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(
+        EDITOR_WIDTH,
+        EDITOR_HEIGHT,
+    )));
+}
+
+pub(crate) fn closest_ui_scale(scale: f32) -> f32 {
+    UI_SCALE_STEPS
+        .into_iter()
+        .min_by(|left, right| (scale - left).abs().total_cmp(&(scale - right).abs()))
+        .unwrap_or(1.0)
 }
 
 #[derive(Clone, Copy)]
@@ -296,6 +316,9 @@ fn header(ui: &mut egui::Ui, palette: Palette, dark: &AtomicBool, about_open: &m
     let brand = ui.interact(brand_rect, Id::new("oiko-audio-about"), Sense::click());
     if brand.clicked() {
         *about_open = !*about_open;
+    }
+    if brand.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     ui.painter().text(
         brand_rect.center(),
@@ -723,8 +746,13 @@ fn footer_param<P: Param>(
     }
 }
 
-fn about_popup(ui: &mut egui::Ui, palette: Palette, open: &mut bool) {
-    let size = Vec2::new(260.0, 166.0);
+fn about_popup(
+    ui: &mut egui::Ui,
+    palette: Palette,
+    open: &mut bool,
+    ui_scale: &crate::UiScaleState,
+) {
+    let size = Vec2::new(286.0, 244.0);
     let rect = Rect::from_min_size(Pos2::new(ui.max_rect().right() - size.x - 12.0, 50.0), size);
     ui.painter().rect(
         rect,
@@ -798,7 +826,72 @@ fn about_popup(ui: &mut egui::Ui, palette: Palette, open: &mut bool) {
         },
     );
     ui.painter().text(
-        rect.left_top() + Vec2::new(15.0, 137.0),
+        rect.left_top() + Vec2::new(15.0, 159.0),
+        Align2::LEFT_TOP,
+        "INTERFACE SCALE",
+        FontId::new(9.0, egui::FontFamily::Proportional),
+        palette.muted,
+    );
+    let scale_row = Rect::from_min_size(
+        rect.left_top() + Vec2::new(15.0, 177.0),
+        Vec2::new(rect.width() - 30.0, 24.0),
+    );
+    let gap = 3.0;
+    let button_width =
+        (scale_row.width() - gap * (UI_SCALE_STEPS.len() - 1) as f32) / UI_SCALE_STEPS.len() as f32;
+    let current_scale = ui_scale.get();
+    for (index, scale) in UI_SCALE_STEPS.into_iter().enumerate() {
+        let button_rect = Rect::from_min_size(
+            Pos2::new(
+                scale_row.left() + index as f32 * (button_width + gap),
+                scale_row.top(),
+            ),
+            Vec2::new(button_width, scale_row.height()),
+        );
+        let response = ui.interact(
+            button_rect,
+            Id::new(("interface-scale", index)),
+            Sense::click(),
+        );
+        let selected = (scale - current_scale).abs() < 0.001;
+        ui.painter().rect_filled(
+            button_rect,
+            2.0,
+            if selected {
+                mix_color(palette.track, palette.left, 0.18)
+            } else if response.hovered() {
+                palette.track
+            } else {
+                palette.page
+            },
+        );
+        ui.painter().rect_stroke(
+            button_rect,
+            2.0,
+            Stroke::new(1.0, if selected { palette.left } else { palette.rule }),
+            StrokeKind::Inside,
+        );
+        ui.painter().text(
+            button_rect.center(),
+            Align2::CENTER_CENTER,
+            format!("{}", (scale * 100.0) as u32),
+            FontId::new(8.0, egui::FontFamily::Proportional),
+            if selected || response.hovered() {
+                palette.ink
+            } else {
+                palette.muted
+            },
+        );
+        if response.clicked() {
+            ui_scale.set(scale);
+            request_settled_scale(ui.ctx(), scale);
+        }
+        if response.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+    }
+    ui.painter().text(
+        rect.left_top() + Vec2::new(15.0, 220.0),
         Align2::LEFT_TOP,
         "MIT License",
         FontId::new(11.0, egui::FontFamily::Proportional),
@@ -806,9 +899,26 @@ fn about_popup(ui: &mut egui::Ui, palette: Palette, open: &mut bool) {
     );
 }
 
+fn mix_color(from: Color32, to: Color32, amount: f32) -> Color32 {
+    let amount = amount.clamp(0.0, 1.0);
+    let mix = |from: u8, to: u8| (from as f32 + (to as f32 - from as f32) * amount) as u8;
+    Color32::from_rgb(
+        mix(from.r(), to.r()),
+        mix(from.g(), to.g()),
+        mix(from.b(), to.b()),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn interface_scale_snaps_to_the_nearest_quarter_step() {
+        assert_eq!(closest_ui_scale(0.51), 0.5);
+        assert_eq!(closest_ui_scale(1.13), 1.25);
+        assert_eq!(closest_ui_scale(1.88), 2.0);
+    }
 
     #[test]
     fn display_history_is_ordered_and_bounded() {

@@ -1,13 +1,19 @@
 mod editor;
 
-use editor::{DISPLAY_REFRESH_HZ, EDITOR_HEIGHT, EDITOR_WIDTH, ModulationDisplay, WowEditor};
+use editor::{
+    DISPLAY_REFRESH_HZ, EDITOR_HEIGHT, EDITOR_WIDTH, ModulationDisplay, WowEditor, closest_ui_scale,
+};
+use nice_plug::params::persist::PersistentField;
 use nice_plug::prelude::*;
 use nice_plug_egui::{
     EguiEditor, EguiEditorState, EguiNiceSettings, RepaintNotifier, create_egui_editor,
 };
 use std::{
     num::NonZeroU32,
-    sync::{Arc, OnceLock},
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicU32, Ordering},
+    },
 };
 use wow_dsp::{
     QualityMode, QualityVariableDelayF32, SincBankF32,
@@ -48,6 +54,9 @@ struct Channel {
 
 #[derive(Params)]
 struct WowParams {
+    #[persist = "ui-scale-v1"]
+    ui_scale: UiScaleState,
+
     #[id = "rate"]
     rate: FloatParam,
 
@@ -131,6 +140,7 @@ impl Default for WowParams {
         };
 
         Self {
+            ui_scale: UiScaleState::default(),
             rate: FloatParam::new("Wow Rate", 0.6, wow_rate_range)
                 .with_smoother(SmoothingStyle::Logarithmic(50.0))
                 .with_unit(" Hz")
@@ -190,6 +200,43 @@ impl Default for WowParams {
     }
 }
 
+#[derive(Clone)]
+pub(crate) struct UiScaleState {
+    value: Arc<AtomicU32>,
+}
+
+impl Default for UiScaleState {
+    fn default() -> Self {
+        Self {
+            value: Arc::new(AtomicU32::new(1.0_f32.to_bits())),
+        }
+    }
+}
+
+impl UiScaleState {
+    pub(crate) fn get(&self) -> f32 {
+        f32::from_bits(self.value.load(Ordering::Acquire)).clamp(0.5, 2.0)
+    }
+
+    pub(crate) fn set(&self, scale: f32) {
+        self.value
+            .store(scale.clamp(0.5, 2.0).to_bits(), Ordering::Release);
+    }
+}
+
+impl<'a> PersistentField<'a, f32> for UiScaleState {
+    fn set(&self, new_value: f32) {
+        self.set(new_value);
+    }
+
+    fn map<F, R>(&self, f: F) -> R
+    where
+        F: Fn(&f32) -> R,
+    {
+        f(&self.get())
+    }
+}
+
 impl Default for WowPlugin {
     fn default() -> Self {
         Self {
@@ -246,6 +293,18 @@ impl Plugin for WowPlugin {
     }
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Self::Editor> {
+        // egui-baseview stores the physical window size after a zoom change. Recreate the editor
+        // state from Wow's fixed logical canvas whenever the window opens so the saved user zoom
+        // is applied exactly once instead of compounding across reopenings.
+        let interface_scale = closest_ui_scale(self.params.ui_scale.get());
+        self.params.ui_scale.set(interface_scale);
+        self.editor_state = EguiEditorState::from_size(
+            nice_plug::editor::dpi::LogicalSize {
+                width: EDITOR_WIDTH,
+                height: EDITOR_HEIGHT,
+            },
+            interface_scale,
+        );
         create_egui_editor(
             self.editor_state.clone(),
             RepaintNotifier::new(),
@@ -554,6 +613,20 @@ nice_export_vst3!(WowPlugin);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn interface_scale_round_trips_and_stays_within_supported_bounds() {
+        let scale = UiScaleState::default();
+        assert!((scale.get() - 1.0).abs() < 1.0e-6);
+        scale.set(1.75);
+        let snapshot = PersistentField::map(&scale, |value| *value);
+        let restored = UiScaleState::default();
+        PersistentField::set(&restored, snapshot);
+        assert!((restored.get() - 1.75).abs() < 1.0e-6);
+
+        restored.set(3.0);
+        assert!((restored.get() - 2.0).abs() < 1.0e-6);
+    }
 
     #[test]
     fn exported_parameter_order_keeps_amount_on_the_main_page() {

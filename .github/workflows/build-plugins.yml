@@ -24,14 +24,10 @@ jobs:
             runner: windows-2025
             artifact: wow-windows-x86_64
             archive: wow-windows-x86_64.zip
-          - name: macOS Apple Silicon
+          - name: macOS Universal
             runner: macos-15
-            artifact: wow-macos-arm64
-            archive: wow-macos-arm64.zip
-          - name: macOS Intel
-            runner: macos-15-intel
-            artifact: wow-macos-x86_64
-            archive: wow-macos-x86_64.zip
+            artifact: wow-macos-universal
+            archive: wow-macos-universal.zip
 
     steps:
       - name: Check out repository
@@ -58,7 +54,21 @@ jobs:
         run: cargo test --workspace
 
       - name: Build CLAP and VST3 bundles
+        if: runner.os != 'macOS'
         run: cargo run -p xtask -- bundle wow-plugin --release
+
+      - name: Build universal CLAP, VST3, and AUv2 bundles
+        if: runner.os == 'macOS'
+        run: scripts/build-macos-universal.sh
+
+      - name: Validate AUv2
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
+          ditto "target/bundled/Oiko Wow.component" \
+            "$HOME/Library/Audio/Plug-Ins/Components/Oiko Wow.component"
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          auval -v aufx OWow Oiko
 
       - name: Package Linux bundles
         if: runner.os == 'Linux'

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "security:minimumReleaseAgeCrate",
+    ":enableVulnerabilityAlerts",
+    ":maintainLockFilesMonthly",
+    "schedule:weekly"
+  ],
+  "timezone": "Europe/London",
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "automerge": false,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the pinned clap-wrapper main branch revision",
+      "managerFilePatterns": ["/^packaging\\/auv2\\/CMakeLists\\.txt$/"],
+      "matchStrings": [
+        "GIT_REPOSITORY\\s+https://github\\.com/free-audio/clap-wrapper\\.git\\s+GIT_TAG\\s+(?<currentDigest>[a-f0-9]{40})"
+      ],
+      "currentValueTemplate": "main",
+      "depNameTemplate": "free-audio/clap-wrapper",
+      "packageNameTemplate": "https://github.com/free-audio/clap-wrapper",
+      "datasourceTemplate": "git-refs"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group compatible Rust dependency updates",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "Rust dependencies"
+    },
+    {
+      "description": "Group compatible GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Require explicit approval for major updates",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Require explicit approval for commit-pinned dependencies",
+      "matchDatasources": ["git-refs"],
+      "dependencyDashboardApproval": true
+    }
+  ]
+}

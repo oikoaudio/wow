@@ -114,14 +114,16 @@ cargo run -p xtask --release -- bundle wow-plugin --release
 
 `Oiko Wow.clap` and `Oiko Wow.vst3` are written to `target/bundled/`.
 
-On macOS, build universal Apple Silicon and Intel CLAP, VST3, and Audio Unit bundles with:
+On macOS, build universal Apple Silicon and Intel CLAP and VST3 bundles with:
 
 ```sh
 scripts/build-macos-universal.sh
 ```
 
-The Audio Unit is an AUv2 effect (`aufx`) identified as `aufx / OWow / Oiko`.
-Hosts display the manufacturer as **Oiko Audio**; `Oiko` is the required four-character AU manufacturer code.
+Audio Unit distribution is temporarily disabled because the AUv2 editor crashes
+Logic Pro's out-of-process Audio Unit host on macOS 26 despite passing `auval`.
+The AU packaging project remains in the repository for explicit compatibility
+testing after the upstream GUI-hosting path is fixed.
 
 The GitHub Actions workflow tests the workspace and creates downloadable native archives for Linux x86-64, Windows x86-64, macOS Apple Silicon, and macOS Intel on pushes to `main`, pull requests, version tags, and manual runs.
 

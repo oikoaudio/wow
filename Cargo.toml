@@ -6,3 +6,10 @@ resolver = "2"
 edition = "2021"
 license = "MIT"
 rust-version = "1.88"
+
+# baseview 0.3.2 passes a non-zero rect together with NSTrackingInVisibleRect.
+# macOS 26.6 asserts on that invalid combination while Logic creates the AU UI.
+# This upstream commit uses NSZeroRect and also contains the accompanying cursor
+# tracking fixes. Remove the patch after crates.io has a release containing it.
+[patch.crates-io]
+baseview = { git = "https://github.com/RustAudio/baseview.git", rev = "c36ca154f882353f04684973dfe683c1b3d6abb3" }

@@ -1,13 +1,13 @@
 mod editor;
+mod host_coordinates;
 
 use editor::{
     DISPLAY_REFRESH_HZ, EDITOR_HEIGHT, EDITOR_WIDTH, ModulationDisplay, WowEditor, closest_ui_scale,
 };
+use host_coordinates::HostCoordinateEditor;
 use nice_plug::params::persist::PersistentField;
 use nice_plug::prelude::*;
-use nice_plug_egui::{
-    EguiEditor, EguiEditorState, EguiNiceSettings, RepaintNotifier, create_egui_editor,
-};
+use nice_plug_egui::{EguiEditorState, EguiNiceSettings, RepaintNotifier, create_egui_editor};
 use std::{
     num::NonZeroU32,
     sync::{
@@ -284,7 +284,7 @@ impl Plugin for WowPlugin {
     const MIDI_INPUT: MidiConfig = MidiConfig::None;
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
-    type Editor = EguiEditor<WowEditor>;
+    type Editor = HostCoordinateEditor<WowEditor>;
     type SysExMessage = ();
     type BackgroundTask = ();
 
@@ -298,19 +298,31 @@ impl Plugin for WowPlugin {
         // is applied exactly once instead of compounding across reopenings.
         let interface_scale = closest_ui_scale(self.params.ui_scale.get());
         self.params.ui_scale.set(interface_scale);
-        self.editor_state = EguiEditorState::from_size(
+        #[cfg(target_os = "macos")]
+        let (editor_size, editor_zoom) = (
+            nice_plug::editor::dpi::LogicalSize {
+                width: EDITOR_WIDTH * interface_scale,
+                height: EDITOR_HEIGHT * interface_scale,
+            },
+            1.0,
+        );
+        #[cfg(not(target_os = "macos"))]
+        let (editor_size, editor_zoom) = (
             nice_plug::editor::dpi::LogicalSize {
                 width: EDITOR_WIDTH,
                 height: EDITOR_HEIGHT,
             },
             interface_scale,
         );
+        self.editor_state = EguiEditorState::from_size(editor_size, editor_zoom);
+        let editor_state = self.editor_state.clone();
         create_egui_editor(
             self.editor_state.clone(),
             RepaintNotifier::new(),
             EguiNiceSettings::new().with_tile(Self::NAME),
             WowEditor::new(self.params.clone(), self.display.clone()),
         )
+        .map(|editor| HostCoordinateEditor::new(editor, editor_state))
     }
 
     fn activate(

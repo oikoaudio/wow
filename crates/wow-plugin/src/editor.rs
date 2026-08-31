@@ -8,8 +8,8 @@ use std::{
 };
 
 use egui::{
-    Align2, Color32, CornerRadius, FontId, Frame, Id, Pos2, Rect, Response, Sense, Shape, Stroke,
-    StrokeKind, Vec2,
+    Align2, Color32, CornerRadius, FontId, Frame, Id, LayerId, Order, Pos2, Rect, Response, Sense,
+    Shape, Stroke, StrokeKind, UiBuilder, Vec2,
 };
 use nice_plug::{context::gui::GuiContext, params::Param};
 use nice_plug_egui::{NiceEguiApp, baseview::HandlerError};
@@ -100,12 +100,17 @@ impl NiceEguiApp for WowEditor {
         apply_theme(&egui_ctx, self.dark.load(Ordering::Relaxed));
         let settled_scale = closest_ui_scale(self.params.ui_scale.get());
         self.params.ui_scale.set(settled_scale);
+        #[cfg(target_os = "macos")]
+        egui_ctx.set_zoom_factor(1.0);
+        #[cfg(not(target_os = "macos"))]
         egui_ctx.set_zoom_factor(settled_scale);
         Ok(())
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut nice_plug_egui::Frame) {
-        ui.ctx().request_repaint_after(Duration::from_millis(16));
+    fn ui(&mut self, root_ui: &mut egui::Ui, _frame: &mut nice_plug_egui::Frame) {
+        root_ui
+            .ctx()
+            .request_repaint_after(Duration::from_millis(16));
         let dark = self.dark.load(Ordering::Relaxed);
         let palette = Palette::new(dark);
         let setter = self
@@ -114,6 +119,28 @@ impl NiceEguiApp for WowEditor {
             .expect("the GUI context is set before drawing")
             .param_setter();
 
+        root_ui
+            .painter()
+            .rect_filled(root_ui.max_rect(), 0.0, palette.panel);
+
+        #[cfg(target_os = "macos")]
+        let render_scale = closest_ui_scale(self.params.ui_scale.get());
+        #[cfg(not(target_os = "macos"))]
+        let render_scale = 1.0;
+        let transform = egui::emath::TSTransform::from_scaling(render_scale);
+        let content_layer = LayerId::new(Order::Middle, Id::new("wow-scaled-content"));
+        root_ui.ctx().set_transform_layer(content_layer, transform);
+
+        let content_rect = Rect::from_min_size(Pos2::ZERO, Vec2::new(EDITOR_WIDTH, EDITOR_HEIGHT));
+        let mut content_ui = root_ui.new_child(
+            UiBuilder::new()
+                .id_salt("wow-scaled-content")
+                .layer_id(content_layer)
+                .max_rect(content_rect)
+                .layout(*root_ui.layout()),
+        );
+        content_ui.set_clip_rect(content_rect);
+        let ui = &mut content_ui;
         ui.set_min_size(Vec2::new(EDITOR_WIDTH, EDITOR_HEIGHT));
         ui.painter().rect_filled(ui.max_rect(), 0.0, palette.panel);
 
@@ -203,11 +230,18 @@ impl NiceEguiApp for WowEditor {
 
 fn request_settled_scale(context: &egui::Context, scale: f32) {
     let scale = closest_ui_scale(scale);
+
+    #[cfg(target_os = "macos")]
+    {
+        context.set_zoom_factor(1.0);
+        context.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(
+            EDITOR_WIDTH * scale,
+            EDITOR_HEIGHT * scale,
+        )));
+    }
+    #[cfg(not(target_os = "macos"))]
     context.set_zoom_factor(scale);
-    context.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(
-        EDITOR_WIDTH,
-        EDITOR_HEIGHT,
-    )));
+    context.request_repaint();
 }
 
 pub(crate) fn closest_ui_scale(scale: f32) -> f32 {

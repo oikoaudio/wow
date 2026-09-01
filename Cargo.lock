@@ -2613,7 +2613,7 @@ version = "0.1.0"
 
 [[package]]
 name = "wow-plugin"
-version = "0.1.1-beta.2"
+version = "0.1.1-beta.3"
 dependencies = [
  "egui",
  "nice-plug",

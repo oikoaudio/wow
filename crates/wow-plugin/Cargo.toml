@@ -1,6 +1,6 @@
 [package]
 name = "wow-plugin"
-version = "0.1.1-beta.2"
+version = "0.1.1-beta.3"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true

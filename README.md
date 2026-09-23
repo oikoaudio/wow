@@ -1,5 +1,7 @@
 # Wow
 
+> **This repository is archived.** Wow is now developed in [oikoaudio/oikoaudio](https://github.com/oikoaudio/oikoaudio/tree/main/plugins/wow), together with our other plugins. Get current builds from [oikoaudio.com/downloads](https://oikoaudio.com/downloads/#wow) and report bugs with the [bug report form](https://github.com/oikoaudio/oikoaudio/issues/new?template=bug-report.yml).
+
 > **Public beta — v0.1.1-beta.3.** Oiko Wow is ready for testing, but the
 > builds are unsigned and should not yet be trusted in irreplaceable sessions.
 
